@@ -70,6 +70,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: DaikinConfigEntry) -> bo
                 ssl_context=ssl_context,
             )
         _LOGGER.debug("Connection to %s successful", host)
+
+        # Fetch ALL resources including energy/year power data
+        # Chris fork optimized init() to only 3 resources — breaks energy detection
+        try:
+            full_resources = getattr(device, 'HTTP_RESOURCES', [])
+            if full_resources:
+                await device.update_status(full_resources)
+                _LOGGER.debug("ACM: full resource fetch for %s complete", host)
+        except Exception as ex:
+            _LOGGER.debug("ACM: full resource fetch partial fail for %s: %s", host, ex)
+
     except TimeoutError as err:
         _LOGGER.debug("Connection to %s timed out in 60 seconds", host)
         raise ConfigEntryNotReady from err
