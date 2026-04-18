@@ -1,0 +1,22 @@
+flash_firmware:
+  name: Flash firmware
+  description: Upload firmware to a Daikin WiFi adapter. Use with caution — only flash known-safe firmware versions.
+  fields:
+    host:
+      name: Host
+      description: IP address of the Daikin adapter
+      required: true
+      example: "192.168.69.22"
+      selector:
+        text:
+    firmware:
+      name: Firmware file
+      description: Firmware filename from the bundled firmware directory
+      required: false
+      default: "DKWL3G_OTA_CS_V1_16_0.bin"
+      selector:
+        text:
+
+scan_network:
+  name: Scan network
+  description: Discover all Daikin adapters on the local network via UDP broadcast. Results are logged and fired as a daikin_acm_scan_result event.

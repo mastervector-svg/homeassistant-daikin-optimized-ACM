@@ -2,61 +2,61 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configure Daikin AC (ACM)",
-        "description": "Enter the IP address of your Daikin AC.\n\nAPI key and password are for BRP072Cxx/SKYFi.\nAdapter KEY is the 13-digit code from the sticker on your WiFi adapter (optional, for KEY crowdsourcing).",
+        "title": "Daikin AC (ACM)",
+        "description": "Scan your network for Daikin adapters or enter an IP address manually.",
         "data": {
-          "host": "[%key:common::config_flow::data::host%]",
-          "api_key": "[%key:common::config_flow::data::api_key%]",
-          "password": "[%key:common::config_flow::data::password%]",
-          "adapter_key": "Adapter KEY (from sticker)"
+          "action": "How to add?"
+        }
+      },
+      "discovered": {
+        "title": "Found Daikin adapters",
+        "description": "Select the adapter you want to add. Adapters marked with !!! have dangerous firmware.",
+        "data": {
+          "device": "Adapter"
+        }
+      },
+      "confirm": {
+        "title": "Add {name}",
+        "description": "**{name}** at {ip}\nMAC: `{mac}` | SSID: `{ssid}`\nFirmware: `{firmware}` — {fw_status}\n\nEnter the 13-digit KEY from the sticker on your WiFi adapter (optional but recommended for KEY database).",
+        "data": {
+          "adapter_key": "Adapter KEY (from sticker)",
+          "api_key": "API Key (BRP072C/BRP084 only)",
+          "password": "Password (if protected)"
+        }
+      },
+      "manual": {
+        "title": "Manual setup",
+        "description": "Enter the IP address of your Daikin adapter.",
+        "data": {
+          "host": "IP Address"
         }
       }
     },
     "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]"
+      "already_configured": "This adapter is already configured.",
+      "cannot_connect": "Cannot connect to the adapter."
     },
     "error": {
-      "unknown": "[%key:common::config_flow::error::unknown%]",
-      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
-      "api_password": "Invalid authentication, use either API Key or Password.",
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]"
+      "unknown": "Unexpected error occurred.",
+      "invalid_auth": "Invalid KEY or credentials. Check the sticker on your adapter.",
+      "cannot_connect": "Cannot connect. Check that the adapter is on your network.",
+      "no_devices_found": "No Daikin adapters found. Make sure they are connected to your WiFi and UDP port 30050 is not blocked."
     }
   },
   "entity": {
     "sensor": {
-      "inside_temperature": {
-        "name": "Inside temperature"
-      },
-      "outside_temperature": {
-        "name": "Outside temperature"
-      },
-      "target_humidity": {
-        "name": "Target humidity"
-      },
-      "compressor_estimated_power_consumption": {
-        "name": "Compressor estimated power consumption"
-      },
-      "cool_energy_consumption": {
-        "name": "Cool energy consumption"
-      },
-      "heat_energy_consumption": {
-        "name": "Heat energy consumption"
-      },
-      "energy_consumption": {
-        "name": "Energy consumption"
-      },
-      "compressor_frequency": {
-        "name": "Compressor frequency"
-      },
-      "compressor_energy_consumption": {
-        "name": "Compressor energy consumption"
-      }
+      "inside_temperature": { "name": "Inside temperature" },
+      "outside_temperature": { "name": "Outside temperature" },
+      "target_humidity": { "name": "Target humidity" },
+      "compressor_estimated_power_consumption": { "name": "Compressor estimated power consumption" },
+      "cool_energy_consumption": { "name": "Cool energy consumption" },
+      "heat_energy_consumption": { "name": "Heat energy consumption" },
+      "energy_consumption": { "name": "Energy consumption" },
+      "compressor_frequency": { "name": "Compressor frequency" },
+      "compressor_energy_consumption": { "name": "Compressor energy consumption" }
     },
     "switch": {
-      "toggle": {
-        "name": "Power"
-      }
+      "toggle": { "name": "Power" }
     }
   }
 }

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import ssl
+from pathlib import Path
 
 from aiohttp import ClientConnectionError
 from pydaikin.daikin_base import Appliance
@@ -23,8 +24,9 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 
-from .const import KEY_MAC, TIMEOUT
+from .const import DOMAIN, KEY_MAC, TIMEOUT
 from .coordinator import DaikinConfigEntry, DaikinCoordinator
+from .provisioning import upload_firmware, check_firmware_safety, get_basic_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -83,6 +85,128 @@ async def async_setup_entry(hass: HomeAssistant, entry: DaikinConfigEntry) -> bo
 
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    return True
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Set up Daikin ACM services."""
+
+    async def handle_flash_firmware(call):
+        """Flash firmware to a Daikin adapter.
+
+        Service: daikin_acm.flash_firmware
+        Data: entity_id or host, firmware (bundled name or path)
+        """
+        host = call.data.get("host")
+        firmware_name = call.data.get("firmware", "DKWL3G_OTA_CS_V1_16_0.bin")
+
+        if not host:
+            _LOGGER.error("daikin_acm.flash_firmware: host is required")
+            return
+
+        # Safety check — get current firmware first
+        session = async_get_clientsession(hass)
+        try:
+            info = await get_basic_info(session, host)
+            current_ver = info.get("ver", "").replace("_", ".")
+            _LOGGER.info(
+                "ACM flash: %s currently on firmware %s", host, current_ver
+            )
+        except Exception as err:
+            _LOGGER.error("ACM flash: cannot reach %s: %s", host, err)
+            return
+
+        # Load firmware binary
+        fw_path = Path(__file__).parent / "firmware" / firmware_name
+        if not fw_path.exists():
+            _LOGGER.error("ACM flash: firmware file not found: %s", fw_path)
+            return
+
+        fw_data = fw_path.read_bytes()
+        if len(fw_data) < 1000:
+            _LOGGER.error("ACM flash: firmware file too small, aborting")
+            return
+
+        _LOGGER.warning(
+            "ACM flash: uploading %s (%d bytes) to %s...",
+            firmware_name, len(fw_data), host,
+        )
+
+        ok = await upload_firmware(session, host, fw_data)
+        if ok:
+            _LOGGER.warning(
+                "ACM flash: firmware uploaded to %s. Adapter will reboot.",
+                host,
+            )
+        else:
+            _LOGGER.error("ACM flash: upload FAILED for %s", host)
+
+    async def handle_scan_network(call):
+        """Scan network for Daikin adapters.
+
+        Service: daikin_acm.scan_network
+        """
+        from .provisioning import discover_adapters
+        devices = await hass.async_add_executor_job(_discover_sync_wrapper)
+        for dev in devices:
+            name = dev.get("name", "?")
+            ip = dev.get("ip", "?")
+            ver = dev.get("ver", "?").replace("_", ".")
+            mac = dev.get("mac", "?")
+            safety = check_firmware_safety(ver)
+            status = "SAFE" if safety["safe"] else "DANGEROUS"
+            _LOGGER.info(
+                "ACM scan: found %s at %s (MAC: %s, FW: %s) — %s",
+                name, ip, mac, ver, status,
+            )
+        hass.bus.async_fire(f"{DOMAIN}_scan_result", {
+            "count": len(devices),
+            "devices": [
+                {
+                    "ip": d.get("ip"),
+                    "name": d.get("name"),
+                    "mac": d.get("mac"),
+                    "firmware": d.get("ver", "").replace("_", "."),
+                }
+                for d in devices
+            ],
+        })
+
+    def _discover_sync_wrapper():
+        import socket, time
+        from .provisioning import parse_daikin_response
+        devices = []
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.settimeout(3.0)
+        try:
+            sock.bind(("", 30000))
+        except OSError:
+            sock.bind(("", 0))
+        try:
+            sock.sendto(b"DAIKIN_UDP/common/basic_info", ("<broadcast>", 30050))
+            seen = set()
+            deadline = time.time() + 3.0
+            while time.time() < deadline:
+                try:
+                    data, addr = sock.recvfrom(4096)
+                    ip = addr[0]
+                    if ip in seen:
+                        continue
+                    seen.add(ip)
+                    info = parse_daikin_response(data.decode("utf-8", errors="ignore"))
+                    info["ip"] = ip
+                    devices.append(info)
+                except socket.timeout:
+                    break
+        finally:
+            sock.close()
+        return devices
+
+    hass.services.async_register(DOMAIN, "flash_firmware", handle_flash_firmware)
+    hass.services.async_register(DOMAIN, "scan_network", handle_scan_network)
+
     return True
 
 
