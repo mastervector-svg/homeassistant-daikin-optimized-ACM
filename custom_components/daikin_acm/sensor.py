@@ -130,6 +130,10 @@ SENSOR_TYPES: tuple[DaikinSensorEntityDescription, ...] = (
     ),
 )
 
+# ACM extra sensor keys
+ATTR_FIRMWARE = "firmware_version"
+ATTR_RUNTIME_TODAY = "runtime_today"
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -158,6 +162,11 @@ async def async_setup_entry(
         for description in SENSOR_TYPES
         if description.key in sensors
     ]
+
+    # ACM extra sensors — firmware version + runtime
+    entities.append(DaikinFirmwareSensor(daikin_api))
+    entities.append(DaikinRuntimeSensor(daikin_api))
+
     async_add_entities(entities)
 
 
@@ -178,3 +187,65 @@ class DaikinSensor(DaikinEntity, SensorEntity):
     def native_value(self) -> float | None:
         """Return the state of the sensor."""
         return self.entity_description.value_func(self.device)
+
+
+class DaikinFirmwareSensor(DaikinEntity, SensorEntity):
+    """Firmware version sensor — shows current adapter firmware."""
+
+    _attr_icon = "mdi:chip"
+    _attr_entity_category = "diagnostic"
+
+    def __init__(self, coordinator: DaikinCoordinator) -> None:
+        """Initialize."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self.device.mac}-firmware"
+
+    @property
+    def name(self) -> str:
+        return "Firmware"
+
+    @property
+    def native_value(self) -> str:
+        ver = self.device.values.get("ver", "unknown")
+        return ver.replace("_", ".")
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        from .provisioning import check_firmware_safety
+        ver = self.native_value
+        safety = check_firmware_safety(ver)
+        return {
+            "safe_for_local_api": safety["safe"],
+            "max_safe_version": safety["max_safe"],
+            "warning": safety["warning"],
+            "mac": self.device.mac,
+            "adapter_model": self.device.values.get("model", ""),
+            "adp_kind": self.device.values.get("adp_kind", ""),
+        }
+
+
+class DaikinRuntimeSensor(DaikinEntity, SensorEntity):
+    """Today runtime sensor — minutes of operation today."""
+
+    _attr_icon = "mdi:timer-outline"
+    _attr_native_unit_of_measurement = "min"
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    def __init__(self, coordinator: DaikinCoordinator) -> None:
+        """Initialize."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self.device.mac}-runtime"
+
+    @property
+    def name(self) -> str:
+        return "Runtime Today"
+
+    @property
+    def native_value(self) -> int | None:
+        val = self.device.values.get("today_runtime")
+        if val is not None:
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                pass
+        return None
