@@ -2,12 +2,13 @@
   "config": {
     "step": {
       "user": {
-        "title": "Configure Daikin AC",
-        "description": "Enter the IP address of your Daikin AC.\n\nNote that API key and password are only used by BRP072Cxx and SKYFi devices respectively.",
+        "title": "Configure Daikin AC (ACM)",
+        "description": "Enter the IP address of your Daikin AC.\n\nAPI key and password are for BRP072Cxx/SKYFi.\nAdapter KEY is the 13-digit code from the sticker on your WiFi adapter (optional, for KEY crowdsourcing).",
         "data": {
           "host": "[%key:common::config_flow::data::host%]",
           "api_key": "[%key:common::config_flow::data::api_key%]",
-          "password": "[%key:common::config_flow::data::password%]"
+          "password": "[%key:common::config_flow::data::password%]",
+          "adapter_key": "Adapter KEY (from sticker)"
         }
       }
     },

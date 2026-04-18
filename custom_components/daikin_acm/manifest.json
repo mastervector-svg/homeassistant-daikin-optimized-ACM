@@ -1,9 +1,9 @@
 {
-  "domain": "daikin",
+  "domain": "daikin_acm",
   "name": "Daikin AC (ACM Edition)",
-  "codeowners": ["@Chris971991", "@maxcloud-acm"],
+  "codeowners": ["@Chris971991", "@mastervector-svg"],
   "config_flow": true,
-  "documentation": "https://www.home-assistant.io/integrations/daikin",
+  "documentation": "https://github.com/mastervector-svg/homeassistant-daikin-optimized-ACM",
   "iot_class": "local_polling",
   "loggers": ["pydaikin"],
   "requirements": ["pydaikin @ git+https://github.com/Chris971991/pydaikin-2.8.0.git@650a0594c271f58eaff9d15f3955e4f6fc410292"],

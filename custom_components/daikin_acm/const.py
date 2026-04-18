@@ -1,6 +1,6 @@
 """Constants for Daikin ACM."""
 
-DOMAIN = "daikin"
+DOMAIN = "daikin_acm"
 
 # KEY crowdsourcing — community GitHub issues, no external server
 CONF_CONTRIBUTE_KEY = "contribute_key"

@@ -1,7 +1,7 @@
 {
-  "name": "Daikin AC - Firmware 2.8.0 Support",
+  "name": "Daikin AC (ACM Edition)",
   "content_in_root": false,
   "render_readme": true,
-  "domains": ["daikin"],
+  "domains": ["daikin_acm"],
   "homeassistant": "2024.1.0"
 }
