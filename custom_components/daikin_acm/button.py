@@ -1,4 +1,4 @@
-"""Button entities for Daikin ACM — firmware flash, WiFi scan."""
+"""Button entities for Daikin ACM — firmware flash."""
 
 from __future__ import annotations
 
@@ -6,11 +6,11 @@ import logging
 from pathlib import Path
 
 from homeassistant.components.button import ButtonEntity
+from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import CONF_HOST
 from .coordinator import DaikinConfigEntry, DaikinCoordinator
 from .entity import DaikinEntity
 from .provisioning import upload_firmware, check_firmware_safety
@@ -54,8 +54,20 @@ class DaikinFlashFirmwareButton(DaikinEntity, ButtonEntity):
 
     async def async_press(self) -> None:
         """Flash bundled firmware to the adapter."""
+        adp_kind = self.device.values.get("adp_kind", "")
+
+        # Marvell adapters (adp_kind=3) need AP mode for firmware flash
+        if str(adp_kind) == "3":
+            _LOGGER.warning(
+                "ACM: adapter %s is Marvell (adp_kind=3) — firmware must be "
+                "flashed in AP mode (connect to DaikinAPxxxxx WiFi). "
+                "Skipping OTA flash.",
+                self._host,
+            )
+            return
+
         ver = self.device.values.get("ver", "").replace("_", ".")
-        safety = check_firmware_safety(ver)
+        check_firmware_safety(ver)
 
         # Find appropriate firmware file
         fw_file = None
@@ -68,8 +80,11 @@ class DaikinFlashFirmwareButton(DaikinEntity, ButtonEntity):
             return
 
         _LOGGER.warning(
-            "ACM: flashing %s to %s (current FW: %s)",
-            fw_file.name, self._host, ver,
+            "ACM: flashing %s to %s (current FW: %s, adp_kind=%s)",
+            fw_file.name,
+            self._host,
+            ver,
+            adp_kind,
         )
 
         session = async_get_clientsession(self.hass)

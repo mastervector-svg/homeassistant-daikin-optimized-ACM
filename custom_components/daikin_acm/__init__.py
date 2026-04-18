@@ -23,7 +23,7 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 
-from .const import DOMAIN, KEY_MAC, TIMEOUT
+from .const import DOMAIN, KEY_MAC, TIMEOUT  # noqa: F401
 from .coordinator import DaikinConfigEntry, DaikinCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ def get_daikin_ssl_context() -> ssl.SSLContext:
     return ssl_context
 
 
-PLATFORMS = [Platform.CLIMATE, Platform.SENSOR, Platform.SWITCH]
+PLATFORMS = [Platform.CLIMATE, Platform.SENSOR, Platform.SWITCH, Platform.BUTTON]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: DaikinConfigEntry) -> bool:
@@ -68,6 +68,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: DaikinConfigEntry) -> bo
                 ssl_context=ssl_context,
             )
         _LOGGER.debug("Connection to %s successful", host)
+        # Fetch ALL resources (energy, year power, etc.) so sensors appear
+        try:
+            await device.update_status(device.HTTP_RESOURCES)
+            _LOGGER.debug("Full resource update for %s completed", host)
+        except Exception:
+            _LOGGER.debug("Full resource update for %s failed, continuing with basic data", host)
     except TimeoutError as err:
         _LOGGER.debug("Connection to %s timed out in 60 seconds", host)
         raise ConfigEntryNotReady from err

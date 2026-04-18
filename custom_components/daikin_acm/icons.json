@@ -27,11 +27,28 @@
       },
       "compressor_energy_consumption": {
         "default": "mdi:flash"
+      },
+      "firmware_version": {
+        "default": "mdi:chip"
+      },
+      "today_runtime": {
+        "default": "mdi:timer-outline"
       }
     },
     "switch": {
       "toggle": {
         "default": "mdi:power"
+      },
+      "outdoor_quiet": {
+        "default": "mdi:volume-off"
+      },
+      "night_mode": {
+        "default": "mdi:weather-night"
+      }
+    },
+    "button": {
+      "flash_firmware": {
+        "default": "mdi:cellphone-arrow-down"
       }
     }
   }

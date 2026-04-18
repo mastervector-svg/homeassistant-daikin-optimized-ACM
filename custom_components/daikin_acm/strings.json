@@ -3,43 +3,16 @@
     "step": {
       "user": {
         "title": "Daikin AC (ACM)",
-        "description": "Scan your network for Daikin adapters or set up a new one.",
+        "description": "Scan your network for Daikin adapters or enter IP manually.",
         "data": {
           "action": "What do you want to do?"
         }
       },
-      "discovered": {
-        "title": "Found Daikin adapters",
-        "description": "Select the adapter you want to add. Adapters marked with !!! have dangerous firmware.",
+      "pick": {
+        "title": "Found {count} Daikin adapter(s)",
+        "description": "Select which adapters to add. All are checked by default.",
         "data": {
-          "device": "Adapter"
-        }
-      },
-      "confirm": {
-        "title": "Add {name}",
-        "description": "**{name}** at {ip}\nMAC: `{mac}` | SSID: `{ssid}`\nFirmware: `{firmware}` — {fw_status}\n\nYou can rename this adapter. The name will be written to the unit.",
-        "data": {
-          "device_name": "Adapter name",
-          "adapter_key": "Adapter KEY (from sticker)",
-          "api_key": "API Key (BRP072C/BRP084 only)",
-          "password": "Password (if protected)"
-        }
-      },
-      "no_devices": {
-        "title": "No adapters found",
-        "description": "No Daikin adapters were found on your network.\n\nIf you have a new adapter with a blinking LED, it's in AP mode and needs WiFi setup first.",
-        "data": {
-          "action": "What to do?"
-        }
-      },
-      "ap_setup": {
-        "title": "New adapter setup (AP mode)",
-        "description": "Connect your phone/computer to the adapter's WiFi (DaikinAPxxxxx), then fill in the details below.\n\n1. AP Host: usually 192.168.127.1\n2. KEY: 13-digit code from the sticker on the adapter\n3. Your home WiFi SSID and password\n\nThe adapter will reboot and join your network. Then re-run the scan to add it.",
-        "data": {
-          "ap_host": "Adapter AP address",
-          "adapter_key": "KEY (from sticker)",
-          "wifi_ssid": "Your WiFi network name",
-          "wifi_password": "Your WiFi password"
+          "adapters": "Adapters"
         }
       },
       "manual": {
@@ -54,13 +27,12 @@
       "already_configured": "This adapter is already configured.",
       "all_configured": "All discovered adapters are already configured.",
       "cannot_connect": "Cannot connect to the adapter.",
-      "ap_setup_complete": "WiFi credentials sent! The adapter is rebooting and will join your network. Wait 30 seconds, then add the integration again to find it on your network."
+      "no_devices_found": "No Daikin adapters found on the network.",
+      "no_selection": "No adapters selected."
     },
     "error": {
       "unknown": "Unexpected error occurred.",
-      "invalid_auth": "Invalid KEY. Check the 13-digit code on the sticker on your WiFi adapter.",
-      "cannot_connect": "Cannot connect. Make sure you are connected to the adapter's WiFi (DaikinAPxxxxx) or the adapter is on your network.",
-      "no_devices_found": "No Daikin adapters found on the network."
+      "cannot_connect": "Cannot connect. Make sure the adapter is on your network."
     }
   },
   "entity": {
@@ -73,10 +45,17 @@
       "heat_energy_consumption": { "name": "Heat energy consumption" },
       "energy_consumption": { "name": "Energy consumption" },
       "compressor_frequency": { "name": "Compressor frequency" },
-      "compressor_energy_consumption": { "name": "Compressor energy consumption" }
+      "compressor_energy_consumption": { "name": "Compressor energy consumption" },
+      "firmware_version": { "name": "Firmware version" },
+      "today_runtime": { "name": "Today runtime" }
     },
     "switch": {
-      "toggle": { "name": "Power" }
+      "toggle": { "name": "Power" },
+      "outdoor_quiet": { "name": "Outdoor quiet" },
+      "night_mode": { "name": "Night mode" }
+    },
+    "button": {
+      "flash_firmware": { "name": "Flash firmware" }
     }
   }
 }

@@ -19,7 +19,9 @@ from homeassistant.const import (
     UnitOfFrequency,
     UnitOfPower,
     UnitOfTemperature,
+    UnitOfTime,
 )
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -158,6 +160,11 @@ async def async_setup_entry(
         for description in SENSOR_TYPES
         if description.key in sensors
     ]
+
+    # ACM additional sensors — always added
+    entities.append(DaikinFirmwareSensor(daikin_api))
+    entities.append(DaikinRuntimeSensor(daikin_api))
+
     async_add_entities(entities)
 
 
@@ -178,3 +185,62 @@ class DaikinSensor(DaikinEntity, SensorEntity):
     def native_value(self) -> float | None:
         """Return the state of the sensor."""
         return self.entity_description.value_func(self.device)
+
+
+# ---------------------------------------------------------------------------
+# ACM additional sensors
+# ---------------------------------------------------------------------------
+
+
+class DaikinFirmwareSensor(DaikinEntity, SensorEntity):
+    """Shows firmware version string from the adapter."""
+
+    _attr_translation_key = "firmware_version"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:chip"
+
+    def __init__(self, coordinator: DaikinCoordinator) -> None:
+        """Initialize."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self.device.mac}-firmware_version"
+
+    @property
+    def name(self) -> str:  # noqa: D102
+        return "Firmware version"
+
+    @property
+    def native_value(self) -> str | None:
+        """Return firmware version string."""
+        ver = self.device.values.get("ver", None)
+        if ver:
+            return ver.replace("_", ".")
+        return None
+
+
+class DaikinRuntimeSensor(DaikinEntity, SensorEntity):
+    """Shows today_runtime minutes from the adapter."""
+
+    _attr_translation_key = "today_runtime"
+    _attr_icon = "mdi:timer-outline"
+    _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    def __init__(self, coordinator: DaikinCoordinator) -> None:
+        """Initialize."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self.device.mac}-today_runtime"
+
+    @property
+    def name(self) -> str:  # noqa: D102
+        return "Today runtime"
+
+    @property
+    def native_value(self) -> int | None:
+        """Return today's runtime in minutes."""
+        val = self.device.values.get("today_runtime")
+        if val is not None:
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                pass
+        return None
