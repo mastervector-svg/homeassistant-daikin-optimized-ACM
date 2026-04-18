@@ -1,0 +1,38 @@
+{
+  "entity": {
+    "sensor": {
+      "inside_temperature": {
+        "default": "mdi:thermometer"
+      },
+      "outside_temperature": {
+        "default": "mdi:sun-thermometer"
+      },
+      "target_humidity": {
+        "default": "mdi:water-percent"
+      },
+      "compressor_frequency": {
+        "default": "mdi:fan"
+      },
+      "compressor_estimated_power_consumption": {
+        "default": "mdi:lightning-bolt"
+      },
+      "cool_energy_consumption": {
+        "default": "mdi:snowflake"
+      },
+      "heat_energy_consumption": {
+        "default": "mdi:fire"
+      },
+      "energy_consumption": {
+        "default": "mdi:flash"
+      },
+      "compressor_energy_consumption": {
+        "default": "mdi:flash"
+      }
+    },
+    "switch": {
+      "toggle": {
+        "default": "mdi:power"
+      }
+    }
+  }
+}
