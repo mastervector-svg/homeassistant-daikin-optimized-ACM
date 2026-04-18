@@ -84,7 +84,7 @@ SENSOR_TYPES: tuple[DaikinSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.POWER,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPower.KILO_WATT,
-        value_func=lambda device: round(device.current_total_power_consumption, 2),
+        value_func=lambda device: min(round(device.current_total_power_consumption, 2), 10.0),
     ),
     DaikinSensorEntityDescription(
         key=ATTR_COOL_ENERGY,

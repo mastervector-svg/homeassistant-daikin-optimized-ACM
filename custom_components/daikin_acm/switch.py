@@ -44,7 +44,10 @@ async def async_setup_entry(
 
     # ACM: outdoor unit quiet mode (demand control)
     if daikin_api.device.values.get("dmnd") == "1" or daikin_api.device.values.get("en_demand") is not None:
-        switches.append(DaikinOutdoorQuietSwitch(daikin_api, entry.data.get("host", "")))
+        switches.append(DaikinOutdoorQuietSwitch(daikin_api, entry.data.get(CONF_HOST, "")))
+
+    # ACM: night mode (econo + silence fan + outdoor quiet)
+    switches.append(DaikinNightModeSwitch(daikin_api, entry.data.get(CONF_HOST, "")))
 
     async_add_entities(switches)
 
@@ -184,3 +187,71 @@ class DaikinOutdoorQuietSwitch(DaikinEntity, SwitchEntity):
                 self._is_on = False
         except Exception:
             pass
+
+
+class DaikinNightModeSwitch(DaikinEntity, SwitchEntity):
+    """Night mode — combines econo + silence fan + outdoor quiet.
+
+    ON:  f_rate=B (silence), econo ON, demand_control max_pow=50
+    OFF: restore previous f_rate, econo OFF, demand_control OFF
+    """
+
+    _attr_name = "Night Mode"
+    _attr_icon = "mdi:weather-night"
+
+    def __init__(self, coordinator: DaikinCoordinator, host: str) -> None:
+        """Initialize."""
+        super().__init__(coordinator)
+        self._host = host
+        self._attr_unique_id = f"{self.device.mac}-night_mode"
+        self._is_on = False
+        self._prev_f_rate = "A"  # auto
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if night mode active."""
+        # Night mode = econo active + silence fan
+        adv = self.device.values.get("adv", "")
+        f_rate = self.device.values.get("f_rate", "")
+        return "12" in str(adv) and f_rate == "B"
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Activate night mode."""
+        # Save current fan rate
+        self._prev_f_rate = self.device.values.get("f_rate", "A")
+
+        # Set econo mode ON
+        await self.device.set_advanced_mode("econo", "on")
+
+        # Set fan to silence
+        await self.device.set({"f_rate": "B"})
+
+        # Set outdoor quiet
+        session = async_get_clientsession(self.hass)
+        url = f"http://{self._host}/aircon/set_demand_control"
+        try:
+            async with session.get(url, params={"type": "1", "en_demand": "1", "mode": "0", "max_pow": "50"}, timeout=aiohttp.ClientTimeout(total=5)):
+                pass
+        except Exception:
+            pass
+
+        self._is_on = True
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Deactivate night mode."""
+        # Econo OFF
+        await self.device.set_advanced_mode("econo", "off")
+
+        # Restore fan rate
+        await self.device.set({"f_rate": self._prev_f_rate})
+
+        # Outdoor quiet OFF
+        session = async_get_clientsession(self.hass)
+        url = f"http://{self._host}/aircon/set_demand_control"
+        try:
+            async with session.get(url, params={"type": "1", "en_demand": "0", "mode": "0", "max_pow": "100"}, timeout=aiohttp.ClientTimeout(total=5)):
+                pass
+        except Exception:
+            pass
+
+        self._is_on = False
