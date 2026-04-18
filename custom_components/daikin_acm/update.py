@@ -29,7 +29,7 @@ FIRMWARE_DIR = Path(__file__).parent / "firmware"
 
 # Last safe firmware versions — confirmed with local API support
 TARGET_FIRMWARE = {
-    "3": "1.14.88",   # Marvell BRP069B — last confirmed safe
+    "3": "1.14.84",   # Marvell BRP069B — confirmed safe, no OTA available
     "4": "1.19.0",    # Realtek BRP084C — last before dsiot
 }
 
@@ -95,17 +95,9 @@ class DaikinFirmwareUpdate(DaikinEntity, UpdateEntity):
         """Release notes."""
         current = _ver_tuple(self.installed_version or "0")
         target = _ver_tuple(self.latest_version or "0")
-        safe = _ver_tuple("1.14.88")
-        if current >= safe:
-            return f"Firmware {self.installed_version} — OK, safe for local API."
         if current >= target:
-            return f"Firmware {self.installed_version} — OK, safe for local API."
-        return f"Firmware {self.installed_version} is OUTDATED. Safe version is 1.14.88."
-        if self._adp_kind == "3":
-            return (
-                f"Marvell adapter — firmware {self.installed_version}. "
-                f"OTA not supported on this hardware. Max safe: 1.14.88."
-            )
+            return f"Firmware {self.installed_version} — safe for local API."
+        return f"Firmware {self.installed_version} — older but functional."
         return f"Update: {self.installed_version} → {self.latest_version}. OTA flash available."
 
     async def async_install(self, version: str | None, backup: bool, **kwargs) -> None:
