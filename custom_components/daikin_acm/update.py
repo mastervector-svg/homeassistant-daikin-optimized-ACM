@@ -27,15 +27,10 @@ _LOGGER = logging.getLogger(__name__)
 
 FIRMWARE_DIR = Path(__file__).parent / "firmware"
 
-# Last safe firmware versions per adapter type
+# Last safe firmware versions — confirmed with local API support
 TARGET_FIRMWARE = {
-    "3": "1.16.0",   # Marvell (adp_kind=3) — bundled DKWL3G
-    "4": "3.12.3",   # Realtek (adp_kind=4) — bundled DKWL4G
-}
-
-FIRMWARE_FILES = {
-    "3": "DKWL3G_OTA_CS_V1_16_0.bin",
-    "4": "DKWL4G_OTA_CS_V3_12_3.bin",
+    "3": "1.14.88",   # Marvell BRP069B — last confirmed safe
+    "4": "1.19.0",    # Realtek BRP084C — last before dsiot
 }
 
 
@@ -98,13 +93,13 @@ class DaikinFirmwareUpdate(DaikinEntity, UpdateEntity):
         current = _ver_tuple(self.installed_version or "0")
         target = _ver_tuple(self.latest_version or "0")
         if current >= target:
-            return "Firmware is up to date. This is the last version with local API support."
+            return f"Firmware {self.installed_version} is the last safe version with local API support."
         if self._adp_kind == "3":
             return (
-                f"Update available: {self.installed_version} → {self.latest_version}. "
-                f"Marvell adapter — OTA flash not supported, must flash in AP mode."
+                f"Update: {self.installed_version} → {self.latest_version}. "
+                f"Use Daikin Remoapp to flash. Do NOT update past {self.latest_version}!"
             )
-        return f"Update available: {self.installed_version} → {self.latest_version}."
+        return f"Update: {self.installed_version} → {self.latest_version}. OTA flash available."
 
     async def async_install(self, version: str | None, backup: bool, **kwargs) -> None:
         """Install firmware update."""
@@ -120,11 +115,13 @@ class DaikinFirmwareUpdate(DaikinEntity, UpdateEntity):
 
         if self._adp_kind == "3":
             _LOGGER.warning(
-                "ACM: Marvell adapter at %s — cannot OTA flash. "
-                "Reset adapter to AP mode (hold button 5s), connect to DaikinAPxxxxx, "
-                "then flash from there.",
+                "ACM: Marvell adapter at %s — OTA endpoint not available on this hardware. "
+                "Use the Daikin Remoapp to update firmware (the app bundles the firmware). "
+                "DO NOT update past 1.14.88 — newer versions remove local API.",
                 self._host,
             )
+            self._installing = False
+            self.async_write_ha_state()
             return
 
         self._installing = True
