@@ -53,10 +53,13 @@ async def async_setup_entry(
 class DaikinFirmwareUpdate(DaikinEntity, UpdateEntity):
     """Firmware update entity — shows version, update button with progress."""
 
-    _attr_supported_features = (
-        UpdateEntityFeature.INSTALL
-        | UpdateEntityFeature.PROGRESS
-    )
+    @property
+    def supported_features(self) -> UpdateEntityFeature:
+        """Only show install button for Realtek adapters that support OTA."""
+        if self._adp_kind == "4":
+            return UpdateEntityFeature.INSTALL | UpdateEntityFeature.PROGRESS
+        # Marvell — show version info only, no install button
+        return UpdateEntityFeature(0)
     _attr_icon = "mdi:chip"
     _attr_title = "Adapter Firmware"
 
@@ -79,8 +82,11 @@ class DaikinFirmwareUpdate(DaikinEntity, UpdateEntity):
 
     @property
     def latest_version(self) -> str | None:
-        """Target firmware we have bundled."""
-        return TARGET_FIRMWARE.get(self._adp_kind, self.installed_version)
+        """Target firmware — only for adapters that support OTA (adp_kind=4)."""
+        if self._adp_kind == "4":
+            return TARGET_FIRMWARE.get("4", self.installed_version)
+        # Marvell: no OTA, report current as latest (no update badge)
+        return self.installed_version
 
     @property
     def in_progress(self) -> bool | int:
@@ -96,8 +102,8 @@ class DaikinFirmwareUpdate(DaikinEntity, UpdateEntity):
             return f"Firmware {self.installed_version} is the last safe version with local API support."
         if self._adp_kind == "3":
             return (
-                f"Update: {self.installed_version} → {self.latest_version}. "
-                f"Use Daikin Remoapp to flash. Do NOT update past {self.latest_version}!"
+                f"Marvell adapter — firmware {self.installed_version}. "
+                f"OTA not supported on this hardware. Max safe: 1.14.88."
             )
         return f"Update: {self.installed_version} → {self.latest_version}. OTA flash available."
 
