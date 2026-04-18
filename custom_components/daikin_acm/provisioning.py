@@ -75,9 +75,10 @@ async def discover_adapters(timeout: float = 3.0) -> list[dict[str, str]]:
 async def get_basic_info(session: aiohttp.ClientSession, host: str) -> dict[str, str]:
     """GET /common/basic_info from adapter."""
     url = f"http://{host}/common/basic_info"
-    async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-        text = await resp.text()
-        return parse_daikin_response(text)
+    async with aiohttp.ClientSession() as s:
+        async with s.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            text = await resp.text()
+            return parse_daikin_response(text)
 
 
 async def get_spw(session: aiohttp.ClientSession, host: str) -> str | None:
