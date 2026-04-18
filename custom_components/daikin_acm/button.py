@@ -29,9 +29,11 @@ async def async_setup_entry(
     coordinator = entry.runtime_data
     host = entry.data.get(CONF_HOST, "")
 
-    entities = [
-        DaikinFlashFirmwareButton(coordinator, host),
-    ]
+    # Flash button only for Realtek adapters (adp_kind=4) that support OTA
+    adp_kind = str(coordinator.device.values.get("adp_kind", ""))
+    entities = []
+    if adp_kind == "4":
+        entities.append(DaikinFlashFirmwareButton(coordinator, host))
     async_add_entities(entities)
 
 
