@@ -120,12 +120,26 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
             self.discovered = []
 
         if not self.discovered:
-            # Nothing found — offer AP mode setup or manual
             return await self.async_step_no_devices()
 
-        # Build selection list: "IP — Name (FW ver)"
+        # Filter out already-configured adapters
+        configured_macs = set()
+        for entry in self.hass.config_entries.async_entries(DOMAIN):
+            mac = entry.data.get(KEY_MAC, "")
+            if mac:
+                configured_macs.add(mac.upper().replace(":", ""))
+
+        new_devices = [
+            dev for dev in self.discovered
+            if dev.get("mac", "").upper() not in configured_macs
+        ]
+
+        if not new_devices:
+            return self.async_abort(reason="all_configured")
+
+        # Build selection list
         device_options = {}
-        for dev in self.discovered:
+        for dev in new_devices:
             ip = dev.get("ip", "?")
             name = _decode_daikin_name(dev.get("name", "Unknown"))
             ver = dev.get("ver", "?").replace("_", ".")
@@ -216,15 +230,20 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
             # BRP072C/BRP084 (adp_kind=4) needs API key — must ask
             if adp_kind == "4":
                 if user_input is not None:
+                    new_name = user_input.get("device_name")
+                    if new_name:
+                        await self._set_adapter_name(self.host, new_name)
                     return await self._finalize(
                         host=self.host,
                         api_key=user_input.get(CONF_API_KEY),
                         password=user_input.get(CONF_PASSWORD),
                         spw=spw,
+                        custom_name=new_name,
                     )
                 return self.async_show_form(
                     step_id="confirm",
                     data_schema=vol.Schema({
+                        vol.Optional("device_name", default=name): str,
                         vol.Required(CONF_API_KEY): str,
                     }),
                     description_placeholders={
@@ -234,13 +253,25 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
                     },
                 )
 
-            # BRP069 (adp_kind=3) — no key needed, go straight
-            _LOGGER.info(
-                "ACM: auto-adding %s at %s (FW %s, MAC %s)",
-                name, self.host, ver, mac,
-            )
-            return await self._finalize(
-                host=self.host, spw=spw,
+            # BRP069 (adp_kind=3) — ask for name only, rest is automatic
+            if user_input is not None:
+                new_name = user_input.get("device_name")
+                if new_name:
+                    await self._set_adapter_name(self.host, new_name)
+                return await self._finalize(
+                    host=self.host, spw=spw, custom_name=new_name,
+                )
+
+            return self.async_show_form(
+                step_id="confirm",
+                data_schema=vol.Schema({
+                    vol.Optional("device_name", default=name): str,
+                }),
+                description_placeholders={
+                    "name": name, "ip": self.host, "mac": mac,
+                    "firmware": ver, "ssid": dev.get("ssid", "?"),
+                    "fw_status": "SAFE" if safety["safe"] else safety["warning"],
+                },
             )
 
         # AP mode (192.168.127.1) — need KEY from sticker
@@ -278,6 +309,22 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
             },
         )
 
+    async def _set_adapter_name(self, host: str, name: str) -> None:
+        """Write name to adapter via /common/set_name."""
+        from urllib.parse import quote
+        session = async_get_clientsession(self.hass)
+        encoded = quote(name)
+        url = f"http://{host}/common/set_name?name={encoded}"
+        try:
+            async with session.get(url, timeout=asyncio.timeout(10)) as resp:
+                text = await resp.text()
+                if "OK" in text:
+                    _LOGGER.info("ACM: set adapter name to '%s' on %s", name, host)
+                else:
+                    _LOGGER.warning("ACM: set_name returned: %s", text)
+        except Exception as err:
+            _LOGGER.debug("ACM: set_name failed for %s: %s", host, err)
+
     async def _finalize(
         self,
         host: str,
@@ -285,6 +332,7 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
         password: str | None = None,
         adapter_key: str | None = None,
         spw: str | None = None,
+        custom_name: str | None = None,
     ) -> ConfigFlowResult:
         """Final step: connect via pydaikin, store entry."""
         if api_key:
@@ -369,10 +417,11 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
             await self.async_set_unique_id(mac)
         self._abort_if_unique_id_configured()
 
+        entry_title = custom_name or _decode_daikin_name(
+            (self.selected_device or {}).get("name", host)
+        )
         return self.async_create_entry(
-            title=_decode_daikin_name(
-                (self.selected_device or {}).get("name", host)
-            ),
+            title=entry_title,
             data={
                 CONF_HOST: host,
                 KEY_MAC: mac,

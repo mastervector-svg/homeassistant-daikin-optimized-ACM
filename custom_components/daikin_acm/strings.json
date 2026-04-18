@@ -17,8 +17,9 @@
       },
       "confirm": {
         "title": "Add {name}",
-        "description": "**{name}** at {ip}\nMAC: `{mac}` | SSID: `{ssid}`\nFirmware: `{firmware}` — {fw_status}",
+        "description": "**{name}** at {ip}\nMAC: `{mac}` | SSID: `{ssid}`\nFirmware: `{firmware}` — {fw_status}\n\nYou can rename this adapter. The name will be written to the unit.",
         "data": {
+          "device_name": "Adapter name",
           "adapter_key": "Adapter KEY (from sticker)",
           "api_key": "API Key (BRP072C/BRP084 only)",
           "password": "Password (if protected)"
@@ -51,6 +52,7 @@
     },
     "abort": {
       "already_configured": "This adapter is already configured.",
+      "all_configured": "All discovered adapters are already configured.",
       "cannot_connect": "Cannot connect to the adapter.",
       "ap_setup_complete": "WiFi credentials sent! The adapter is rebooting and will join your network. Wait 30 seconds, then add the integration again to find it on your network."
     },

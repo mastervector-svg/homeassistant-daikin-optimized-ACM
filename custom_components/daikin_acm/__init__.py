@@ -84,7 +84,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: DaikinConfigEntry) -> bo
     await async_migrate_unique_id(hass, entry, device)
 
     entry.runtime_data = coordinator
+    _LOGGER.warning("ACM: forwarding platforms %s for %s", PLATFORMS, host)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    _LOGGER.warning("ACM: platforms setup complete for %s — device mac=%s", host, device.mac)
     return True
 
 
