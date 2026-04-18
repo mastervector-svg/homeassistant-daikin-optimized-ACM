@@ -43,7 +43,7 @@ def get_daikin_ssl_context() -> ssl.SSLContext:
     return ssl_context
 
 
-PLATFORMS = [Platform.CLIMATE, Platform.SENSOR, Platform.SWITCH, Platform.BUTTON]
+PLATFORMS = [Platform.CLIMATE, Platform.SENSOR, Platform.SWITCH, Platform.UPDATE]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: DaikinConfigEntry) -> bool:
