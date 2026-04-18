@@ -3,9 +3,9 @@
     "step": {
       "user": {
         "title": "Daikin AC (ACM)",
-        "description": "Scan your network for Daikin adapters or enter an IP address manually.",
+        "description": "Scan your network for Daikin adapters or set up a new one.",
         "data": {
-          "action": "How to add?"
+          "action": "What do you want to do?"
         }
       },
       "discovered": {
@@ -17,11 +17,28 @@
       },
       "confirm": {
         "title": "Add {name}",
-        "description": "**{name}** at {ip}\nMAC: `{mac}` | SSID: `{ssid}`\nFirmware: `{firmware}` — {fw_status}\n\nEnter the 13-digit KEY from the sticker on your WiFi adapter (optional but recommended for KEY database).",
+        "description": "**{name}** at {ip}\nMAC: `{mac}` | SSID: `{ssid}`\nFirmware: `{firmware}` — {fw_status}",
         "data": {
           "adapter_key": "Adapter KEY (from sticker)",
           "api_key": "API Key (BRP072C/BRP084 only)",
           "password": "Password (if protected)"
+        }
+      },
+      "no_devices": {
+        "title": "No adapters found",
+        "description": "No Daikin adapters were found on your network.\n\nIf you have a new adapter with a blinking LED, it's in AP mode and needs WiFi setup first.",
+        "data": {
+          "action": "What to do?"
+        }
+      },
+      "ap_setup": {
+        "title": "New adapter setup (AP mode)",
+        "description": "Connect your phone/computer to the adapter's WiFi (DaikinAPxxxxx), then fill in the details below.\n\n1. AP Host: usually 192.168.127.1\n2. KEY: 13-digit code from the sticker on the adapter\n3. Your home WiFi SSID and password\n\nThe adapter will reboot and join your network. Then re-run the scan to add it.",
+        "data": {
+          "ap_host": "Adapter AP address",
+          "adapter_key": "KEY (from sticker)",
+          "wifi_ssid": "Your WiFi network name",
+          "wifi_password": "Your WiFi password"
         }
       },
       "manual": {
@@ -34,13 +51,14 @@
     },
     "abort": {
       "already_configured": "This adapter is already configured.",
-      "cannot_connect": "Cannot connect to the adapter."
+      "cannot_connect": "Cannot connect to the adapter.",
+      "ap_setup_complete": "WiFi credentials sent! The adapter is rebooting and will join your network. Wait 30 seconds, then add the integration again to find it on your network."
     },
     "error": {
       "unknown": "Unexpected error occurred.",
-      "invalid_auth": "Invalid KEY or credentials. Check the sticker on your adapter.",
-      "cannot_connect": "Cannot connect. Check that the adapter is on your network.",
-      "no_devices_found": "No Daikin adapters found. Make sure they are connected to your WiFi and UDP port 30050 is not blocked."
+      "invalid_auth": "Invalid KEY. Check the 13-digit code on the sticker on your WiFi adapter.",
+      "cannot_connect": "Cannot connect. Make sure you are connected to the adapter's WiFi (DaikinAPxxxxx) or the adapter is on your network.",
+      "no_devices_found": "No Daikin adapters found on the network."
     }
   },
   "entity": {

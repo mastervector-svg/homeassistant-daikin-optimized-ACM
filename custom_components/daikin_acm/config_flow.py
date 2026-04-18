@@ -120,13 +120,8 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
             self.discovered = []
 
         if not self.discovered:
-            return self.async_show_form(
-                step_id="discovered",
-                data_schema=vol.Schema({
-                    vol.Required("device"): str,
-                }),
-                errors={"base": "no_devices_found"},
-            )
+            # Nothing found — offer AP mode setup or manual
+            return await self.async_step_no_devices()
 
         # Build selection list: "IP — Name (FW ver)"
         device_options = {}
@@ -188,75 +183,100 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
     async def async_step_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Step 3: Show adapter details, ask for KEY if needed, confirm."""
+        """Step 3: Auto-setup for adapters already on network.
+
+        For adapters on the network:
+        - Auto-fetch SPW via /common/get_spw (no auth needed)
+        - Auto-register if needed
+        - Skip straight to finalize — no form needed
+
+        Only shows form if adapter requires manual KEY (AP mode / BRP072C).
+        """
         dev = self.selected_device or {}
         name = _decode_daikin_name(dev.get("name", "Daikin AC"))
         ver = dev.get("ver", "?").replace("_", ".")
         mac = dev.get("mac", "")
-        method = dev.get("method", "")
+        adp_kind = dev.get("adp_kind", "")
         lpw_flag = dev.get("lpw_flag", "0")
         safety = check_firmware_safety(ver)
 
+        session = async_get_clientsession(self.hass)
+
+        # For adapters already on network (not AP mode): auto-setup
+        if self.host and not self.host.startswith("192.168.127.") and not self.host.startswith("192.168.0.100"):
+            # Auto-fetch SPW
+            spw = None
+            try:
+                spw = await get_spw(session, self.host)
+                if spw:
+                    _LOGGER.info("ACM: auto-retrieved SPW for %s", mac)
+            except Exception:
+                pass
+
+            # BRP072C/BRP084 (adp_kind=4) needs API key — must ask
+            if adp_kind == "4":
+                if user_input is not None:
+                    return await self._finalize(
+                        host=self.host,
+                        api_key=user_input.get(CONF_API_KEY),
+                        password=user_input.get(CONF_PASSWORD),
+                        spw=spw,
+                    )
+                return self.async_show_form(
+                    step_id="confirm",
+                    data_schema=vol.Schema({
+                        vol.Required(CONF_API_KEY): str,
+                    }),
+                    description_placeholders={
+                        "name": name, "ip": self.host, "mac": mac,
+                        "firmware": ver, "ssid": dev.get("ssid", "?"),
+                        "fw_status": "SAFE" if safety["safe"] else safety["warning"],
+                    },
+                )
+
+            # BRP069 (adp_kind=3) — no key needed, go straight
+            _LOGGER.info(
+                "ACM: auto-adding %s at %s (FW %s, MAC %s)",
+                name, self.host, ver, mac,
+            )
+            return await self._finalize(
+                host=self.host, spw=spw,
+            )
+
+        # AP mode (192.168.127.1) — need KEY from sticker
         if user_input is not None:
             adapter_key = user_input.get(CONF_ADAPTER_KEY, "")
-
-            # If adapter needs registration and key provided
-            if adapter_key and method == "home only" and not dev.get("id"):
-                session = async_get_clientsession(self.hass)
+            if adapter_key:
                 ok = await register_terminal(session, self.host, adapter_key)
                 if not ok:
                     return self.async_show_form(
                         step_id="confirm",
-                        data_schema=self._confirm_schema(dev, safety),
+                        data_schema=vol.Schema({
+                            vol.Required(CONF_ADAPTER_KEY): str,
+                        }),
                         errors={"base": "invalid_auth"},
-                        description_placeholders=self._confirm_placeholders(
-                            dev, safety
-                        ),
+                        description_placeholders={
+                            "name": name, "ip": self.host, "mac": mac,
+                            "firmware": ver, "ssid": dev.get("ssid", "?"),
+                            "fw_status": "AP MODE — enter KEY from sticker",
+                        },
                     )
                 _LOGGER.info("ACM: registered terminal on %s", self.host)
-
-            # Connect via pydaikin
             return await self._finalize(
-                host=self.host,
-                api_key=user_input.get(CONF_API_KEY),
-                password=user_input.get(CONF_PASSWORD),
-                adapter_key=adapter_key or None,
+                host=self.host, adapter_key=adapter_key or None,
             )
 
         return self.async_show_form(
             step_id="confirm",
-            data_schema=self._confirm_schema(dev, safety),
-            description_placeholders=self._confirm_placeholders(dev, safety),
+            data_schema=vol.Schema({
+                vol.Required(CONF_ADAPTER_KEY): str,
+            }),
+            description_placeholders={
+                "name": name, "ip": self.host, "mac": mac,
+                "firmware": ver, "ssid": dev.get("ssid", "?"),
+                "fw_status": "AP MODE — enter KEY from sticker",
+            },
         )
-
-    def _confirm_schema(self, dev: dict, safety: dict) -> vol.Schema:
-        """Build schema for confirm step."""
-        fields: dict = {}
-        # Always offer adapter KEY field
-        fields[vol.Optional(CONF_ADAPTER_KEY)] = str
-        # API key for BRP072C/BRP084
-        if dev.get("adp_kind") == "4":
-            fields[vol.Optional(CONF_API_KEY)] = str
-        # Password for lpw-protected adapters
-        if dev.get("lpw_flag") == "1":
-            fields[vol.Optional(CONF_PASSWORD)] = str
-        return vol.Schema(fields)
-
-    def _confirm_placeholders(self, dev: dict, safety: dict) -> dict:
-        """Build description placeholders for confirm step."""
-        name = _decode_daikin_name(dev.get("name", "Daikin AC"))
-        ver = dev.get("ver", "?").replace("_", ".")
-        mac = dev.get("mac", "?")
-        ssid = dev.get("ssid", "?")
-        fw_status = "SAFE" if safety["safe"] else f"WARNING: {safety['warning']}"
-        return {
-            "name": name,
-            "ip": dev.get("ip", self.host or "?"),
-            "mac": mac,
-            "firmware": ver,
-            "ssid": ssid,
-            "fw_status": fw_status,
-        }
 
     async def _finalize(
         self,
@@ -264,6 +284,7 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
         api_key: str | None = None,
         password: str | None = None,
         adapter_key: str | None = None,
+        spw: str | None = None,
     ) -> ConfigFlowResult:
         """Final step: connect via pydaikin, store entry."""
         if api_key:
@@ -312,15 +333,15 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
 
         mac = device.mac
 
-        # Auto-retrieve SPW for future re-pairing
-        spw = None
-        try:
-            session = async_get_clientsession(self.hass)
-            spw = await get_spw(session, host)
-            if spw:
-                _LOGGER.info("ACM: stored SPW for %s for re-pairing", mac)
-        except Exception:
-            pass
+        # Auto-retrieve SPW for future re-pairing (if not already provided)
+        if not spw:
+            try:
+                session = async_get_clientsession(self.hass)
+                spw = await get_spw(session, host)
+                if spw:
+                    _LOGGER.info("ACM: stored SPW for %s for re-pairing", mac)
+            except Exception:
+                pass
 
         # Firmware safety check + log
         try:
@@ -395,6 +416,87 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_HOST, default=self.host): str,
             }),
         )
+
+    async def async_step_no_devices(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """No adapters found on network. Offer AP mode setup or manual IP."""
+        if user_input is not None:
+            action = user_input.get("action", "manual")
+            if action == "ap_setup":
+                return await self.async_step_ap_setup()
+            return await self.async_step_manual()
+
+        return self.async_show_form(
+            step_id="no_devices",
+            data_schema=vol.Schema({
+                vol.Required("action", default="ap_setup"): vol.In({
+                    "ap_setup": "I have an adapter in AP mode (blinking LED)",
+                    "manual": "I know the IP address",
+                }),
+            }),
+        )
+
+    async def async_step_ap_setup(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """AP mode setup: connect to adapter, enter KEY, scan WiFi, send credentials."""
+        if user_input is not None:
+            adapter_key = user_input.get(CONF_ADAPTER_KEY, "")
+            wifi_ssid = user_input.get("wifi_ssid", "")
+            wifi_password = user_input.get("wifi_password", "")
+            ap_host = user_input.get("ap_host", "192.168.127.1")
+
+            if not adapter_key:
+                return self.async_show_form(
+                    step_id="ap_setup",
+                    data_schema=self._ap_schema(),
+                    errors={"base": "invalid_auth"},
+                )
+
+            session = async_get_clientsession(self.hass)
+
+            # Register with KEY
+            ok = await register_terminal(session, ap_host, adapter_key)
+            if not ok:
+                return self.async_show_form(
+                    step_id="ap_setup",
+                    data_schema=self._ap_schema(),
+                    errors={"base": "invalid_auth"},
+                )
+            _LOGGER.info("ACM AP: registered with adapter at %s", ap_host)
+
+            # Send WiFi credentials
+            if wifi_ssid and wifi_password:
+                from .provisioning import connect_wifi, reboot_adapter
+                ok = await connect_wifi(session, ap_host, wifi_ssid, wifi_password)
+                if ok:
+                    _LOGGER.info("ACM AP: WiFi credentials sent, rebooting adapter")
+                    await reboot_adapter(session, ap_host)
+                    return self.async_abort(
+                        reason="ap_setup_complete",
+                    )
+                else:
+                    return self.async_show_form(
+                        step_id="ap_setup",
+                        data_schema=self._ap_schema(),
+                        errors={"base": "cannot_connect"},
+                    )
+
+            return self.async_abort(reason="ap_setup_complete")
+
+        return self.async_show_form(
+            step_id="ap_setup",
+            data_schema=self._ap_schema(),
+        )
+
+    def _ap_schema(self) -> vol.Schema:
+        return vol.Schema({
+            vol.Required("ap_host", default="192.168.127.1"): str,
+            vol.Required(CONF_ADAPTER_KEY): str,
+            vol.Required("wifi_ssid"): str,
+            vol.Required("wifi_password"): str,
+        })
 
     async def async_step_zeroconf(
         self, discovery_info: ZeroconfServiceInfo
