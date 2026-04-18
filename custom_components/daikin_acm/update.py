@@ -82,11 +82,8 @@ class DaikinFirmwareUpdate(DaikinEntity, UpdateEntity):
 
     @property
     def latest_version(self) -> str | None:
-        """Target firmware — only for adapters that support OTA (adp_kind=4)."""
-        if self._adp_kind == "4":
-            return TARGET_FIRMWARE.get("4", self.installed_version)
-        # Marvell: no OTA, report current as latest (no update badge)
-        return self.installed_version
+        """Target firmware — last safe version for this adapter type."""
+        return TARGET_FIRMWARE.get(self._adp_kind, self.installed_version)
 
     @property
     def in_progress(self) -> bool | int:
@@ -98,8 +95,12 @@ class DaikinFirmwareUpdate(DaikinEntity, UpdateEntity):
         """Release notes."""
         current = _ver_tuple(self.installed_version or "0")
         target = _ver_tuple(self.latest_version or "0")
+        safe = _ver_tuple("1.14.88")
+        if current >= safe:
+            return f"Firmware {self.installed_version} — OK, safe for local API."
         if current >= target:
-            return f"Firmware {self.installed_version} is the last safe version with local API support."
+            return f"Firmware {self.installed_version} — OK, safe for local API."
+        return f"Firmware {self.installed_version} is OUTDATED. Safe version is 1.14.88."
         if self._adp_kind == "3":
             return (
                 f"Marvell adapter — firmware {self.installed_version}. "
